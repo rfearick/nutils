@@ -28,6 +28,12 @@ Input and output files are assumed to be CSV files.
 """
 
 def processargs():
+    
+    """
+    Process command line arguments.
+    This is a basic set of commands for Python standard lib 'argparse'
+    """
+    
     parser = argparse.ArgumentParser(
              description="Rebin energy spectrum from varispaced to equispaced bins.",
              formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -43,6 +49,12 @@ def processargs():
     return args
 
 def readwrite(win):
+
+    """
+    Read rebin data from terminal.
+    This uses the Python standard library 'curses'
+    """
+    
     global infile,outfile,start,binsize
     leave=b'n'
     while leave != b"y":
@@ -59,9 +71,12 @@ def readwrite(win):
         curses.echo()
         leave=win.getstr(y,x)
         curses.noecho()
-        #S2=str(s2,encoding='utf-8')
 
 def get_valid_name(win, default=None):
+    """
+    Helper function for readwrite().
+    Validate string.
+    """
     y, x =win.getyx()
     curses.echo()
     s=str(win.getstr(y,x,30),encoding='utf-8')
@@ -70,6 +85,10 @@ def get_valid_name(win, default=None):
     return s
 
 def get_valid_float(win, default=None):
+    """
+    Helper function for readwrite().
+    Validate float.
+    """
     y, x =win.getyx()
     curses.echo()
     loop=True
@@ -98,10 +117,13 @@ class boundary(object):
         self.high=high    # upper edge of bin
 
 def GetBorders(abscissa, counts):
+    
     """
     Gives the lower and upper bound of a channel in the spectrum
-    input:   e   numpy array containing values for abscissa
+    input:   abscissa   numpy array containing values for abscissa
+             counts     numpy array containing spectrum counts
     """
+    
     if not isinstance(abscissa, np.ndarray): raise ValueError("Input 'abscissa' is not an array")
     N=len(abscissa)
     if N<2: raise ValueError("Too few points in abscissa array")
@@ -113,6 +135,8 @@ def GetBorders(abscissa, counts):
         
     for i in range(N):
         index=i
+        # Put boundaries midway between spectrum channels.
+        # For first and last take both boundaries from the one that can be computed.
         if i==0: 
             dup=(abscissa[i+1]-abscissa[i])/2
             low = abscissa[i]-dup
@@ -134,9 +158,19 @@ def GetBorders(abscissa, counts):
     return bounds
 
 def SplitCount(count,inspan,outspan):
+    
         """
-        Split count into channel count + leftover falling outside channel
+        Split count into channel count + leftover falling outside channel.
+        
+        input:   count        value to be split into new bin count + leftover
+                 inspan       tuple of lower and upper limits of bin in old data
+                 outspan      tuple of lower and upper limits of bin in new data
+
+        The count is an integer and count = newcount+leftover holds.
+        This version just rounds the integers, but fuzz can be replaced with a
+        uniform random number for a perhaps better visual effect.
         """
+        
         if count == 0: return (0, 0)
         inwidth = inspan[1]-inspan[0]
         outwidth = outspan[1]-outspan[0]
@@ -147,11 +181,12 @@ def SplitCount(count,inspan,outspan):
         fuzz=0.5
         newcount = int(fraction*count+fuzz)
         leftover = count-newcount
+        
         return newcount, leftover
 
 def Rebinner(old, counts, new, debug=False):
     """
-    Rebins spectrum
+    Rebins spectrum.
     input:   old     numpy array containing values for original scale
              count   numpy array containing values for original counts
              new     numpy array containing values for new scale, equally spaced
@@ -224,6 +259,13 @@ def Rebinner(old, counts, new, debug=False):
     return newcount
 
 def ReadFile(name):
+    """
+    Read csv file containing two columns of data (E, count).
+
+    Conflate all bins with same energy (due to rounding issues at source)
+    while preserving total count in spectrum.
+    Returns a numpy array.
+    """
     with open(name,newline='') as csvfile:
         r=csv.reader(csvfile)
         data=[]
@@ -246,6 +288,9 @@ def ReadFile(name):
     return data
 
 def WriteFile(name, outE, outdata):
+    """
+    Write a csv file containing the new data in two columns.
+    """
     if name == 'r00000': return
     with open(name,'w',newline='') as csvwfile:
         w=csv.writer(csvwfile)
