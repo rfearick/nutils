@@ -16,26 +16,6 @@ energy bins.
 v0.1 22/6/2020
 """
 
-helpmessage="""
-rebin.py: rebin energy spectrum from varispaced to equispaced bins.
-
-Usage:
-
-1) rebin.py      Run from command line with input from running terminal.
-2) rebin --help  Prints this message.
-3) rebin <filename> [args] 
-                 Run from command line with no further input.
-
-   args:
-   -b, --binsize:    Output file binsize in keV.
-                     If omitted, default 30 keV applies.
-   -s, --start:      Starting energy in keV.
-                     If omitted, default 0 keV applies.
-   -o, --outfile:    Output filename. 
-                     If omitted, input filename with binsize appended.
-   -h, --help:       Print this message.
-"""
-
 help_epilog="""
 There are three modes of usage:
 
@@ -55,7 +35,8 @@ def processargs():
     parser.add_argument('infile', help="Input filename")
     parser.add_argument('-b','--binsize', help="Output file binsize in MeV.",
                         default=0.030, type=float)
-    parser.add_argument('-s','--start', help="Starting energy in MeV", default=0.000,type=float)
+    parser.add_argument('-s','--start', help="Starting energy in MeV",
+                        default=0.000,type=float)
     parser.add_argument('-o','--outfile', help="Output filename")
     #parser.add_argument('--', help="", default=)
     args = parser.parse_args()
@@ -246,28 +227,22 @@ def ReadFile(name):
     with open(name,newline='') as csvfile:
         r=csv.reader(csvfile)
         data=[]
-        tof=np.zeros(3100)
-        count=np.zeros(3100,dtype=int)
-        otchan=0
-        counts=0
+        count=0
+        preve=None
         for row in r:
             if len(row)<2: break
-            if otchan==0: 
-                otchan=int(float(row[0])*1000+0.01)
-                ###print("Initial channel=", otchan)
-                firstchan=otchan
-            tmptof=float(row[0])
+            tmpe=float(row[0])
             tmpcount=int(row[1])
-            tchan=int(tmptof*1000+0.01)
-            tof[tchan]=tmptof
-            count[tchan]+=tmpcount
-    ###print("Last channel=", tchan)
-    lastchan=tchan
-    for i in range(3100):
-        if tof[i]==0.0: continue
-        data.append([tof[i],count[i]])
+            # merge rows with same energy
+            if preve==tmpe:
+                count+=tmpcount
+            else:
+                if preve != None:
+                    data.append([preve, count])
+                count=tmpcount
+                preve=tmpe
+        data.append([tmpe,tmpcount])
     data=np.array(data)
-    ###print(np.shape(data))
     return data
 
 def WriteFile(name, outE, outdata):
@@ -296,7 +271,7 @@ if __name__=="__main__":
         infile=args.infile
         outfile=args.outfile
         if outfile == None:
-            outfile='r00000'
+            outfile=""
     else:
         curses.wrapper(readwrite)
     ###print("Here we go...")
@@ -325,15 +300,17 @@ if __name__=="__main__":
     R=Rebinner(data[:,0],data[:,1],outE)
     print("R", len(R))
     WriteFile(Outfile, outE, R)
-    
-    #import matplotlib.pyplot as plt
-    #plt.figure(figsize=(16,6))
-    #scale=np.max(data[:,1])/np.max(R)
-    #plt.plot(data[:,0],data[:,1]/scale,drawstyle='steps-mid')
-    #plt.plot(outE,R,drawstyle='steps-mid')
-    #plt.xlabel("Energy [MeV]")
-    #plt.ylabel("Counts per channel")
-    #plt.show()
+
+    Plot=True
+    if Plot:
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(16,6))
+        scale=np.max(data[:,1])/np.max(R)
+        plt.plot(data[:,0],data[:,1]/scale,drawstyle='steps-mid')
+        plt.plot(outE,R,drawstyle='steps-mid')
+        plt.xlabel("Energy [MeV]")
+        plt.ylabel("Counts per channel")
+        plt.show()
 
     
     
