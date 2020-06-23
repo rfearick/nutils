@@ -346,7 +346,7 @@ if __name__=="__main__":
     print("R", len(R))
     WriteFile(Outfile, outE, R)
 
-    Plot=True
+    Plot=False
     if Plot:
         import matplotlib.pyplot as plt
         plt.figure(figsize=(16,6))
