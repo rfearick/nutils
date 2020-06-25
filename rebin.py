@@ -55,22 +55,24 @@ def readwrite(win):
     This uses the Python standard library 'curses'
     """
     
-    global infile,outfile,start,binsize
+    global infile,outfile,start,binsize,Infile,Outfile
     leave=b'n'
-    while leave != b"y":
-        win.addstr(3,0,"Enter input filename : ")
+    while leave != b'y':
+        win.addstr(3,0,f"Enter input filename [{Infile}]: ")
         infile=get_valid_name(win, default=infile)
-        win.addstr(5,0,"Enter output filename: ")
+        win.addstr(5,0,f"Enter output filename [{outfile}]: ")
         outfile=get_valid_name(win, default=outfile)
-        win.addstr(7,0,"Enter binsize in MeV : ")
+        win.addstr(7,0,f"Enter binsize in MeV [{binsize:.3f}]: ")
         binsize=get_valid_float(win, default=binsize)
-        win.addstr(9,0,"Enter start energy in MeV : ")
+        win.addstr(9,0,f"Enter start energy in MeV [{start:.3f}]: ")
         start=get_valid_float(win, default=start)
-        win.addstr(15,0,"OK to proceed? [y/n]: ")
+        win.addstr(15,0,"OK to proceed? [y/n/q]: ")
         y, x =win.getyx()
         curses.echo()
         leave=win.getstr(y,x)
         curses.noecho()
+        if leave==b'q': exit()
+    return infile,binsize
 
 def get_valid_name(win, default=None):
     """
@@ -78,6 +80,7 @@ def get_valid_name(win, default=None):
     Validate string.
     """
     y, x =win.getyx()
+    win.clrtoeol()
     curses.echo()
     s=str(win.getstr(y,x,30),encoding='utf-8')
     if s=="": s=default
@@ -90,11 +93,12 @@ def get_valid_float(win, default=None):
     Validate float.
     """
     y, x =win.getyx()
+    win.clrtoeol()
     curses.echo()
     loop=True
     while loop:
         try:
-            if default != None: win.addstr(y,x,"%.3f"%default)
+            #if default != None: win.addstr(y,x,"%.3f"%default)
             s=str(win.getstr(y,x,10),encoding='utf-8')
             if s=="":
                 f=default
@@ -306,6 +310,8 @@ if __name__=="__main__":
     binsize=0.030
     infile=None
     outfile=None
+    Infile=None
+    Outfile=None
 
     arglist=sys.argv
     print('')
@@ -318,7 +324,9 @@ if __name__=="__main__":
         if outfile == None:
             outfile=""
     else:
-        curses.wrapper(readwrite)
+        a=curses.wrapper(readwrite)
+    print(a)
+    exit()
     ###print("Here we go...")
     ###print(infile,outfile,start,binsize)
     Infile=Path(infile)
