@@ -97,7 +97,6 @@ def make_new_filepath(infile,outfile):
         stem=infile.stem
         suffix=infile.suffix
         newname=stem+"_rebin"+suffix
-        print(parent,stem,suffix,newname)
         if parent==".":
             Outfile=Path(newname)
         else:
@@ -211,6 +210,7 @@ def SplitCount(count,inspan,outspan):
         return newcount, leftover
 
 def Rebinner(old, counts, new, debug=False):
+    
     """
     Rebins spectrum.
     input:   old     numpy array containing values for original scale
@@ -256,7 +256,8 @@ def Rebinner(old, counts, new, debug=False):
         # borders of output bin
         nlow=new[i]-outdiff
         nhigh=new[i]+outdiff
-        if DEBUG: print('infor',i,'target:',nlow,nhigh,'source',inbounds[iold].low,inbounds[iold].high)
+        if DEBUG: print('infor',i,'target:',nlow,nhigh,'source',
+                        inbounds[iold].low,inbounds[iold].high)
         # skip if above upper limit in input
         if nlow > inhighest:
             newcount[i]=0
@@ -336,8 +337,8 @@ if __name__=="__main__":
     # globals
     start=0.0
     binsize=0.030
-    infile=None
-    outfile=None
+    #infile=None
+    #outfile=None
     Infile=None
     Outfile=None
 
@@ -358,9 +359,6 @@ if __name__=="__main__":
         if Outfile.is_file(): print(Outfile, "exists")
     else:
         binsize,start,Infile,Outfile=curses.wrapper(readwrite,binsize,start,Infile,Outfile)
-    ###print("Here we go...")
-    ###print(infile,outfile,start,binsize)
-    ###print(Outfile)
 
     print("infile:",Infile)
     print("outfile:",Outfile)
@@ -369,11 +367,8 @@ if __name__=="__main__":
     
     data = ReadFile(Infile)
     maxE = data[-1,0]+binsize
-    print(maxE)
     outE=np.arange(start,maxE,binsize)
-    print(len(outE))
     R=Rebinner(data[:,0],data[:,1],outE)
-    print("R", len(R))
     WriteFile(Outfile, outE, R)
 
     Plot=False
