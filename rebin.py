@@ -33,35 +33,35 @@ def processargs():
     Process command line arguments.
     This is a basic set of commands for Python standard lib 'argparse'
     """
-    
+    global binsize, start
     parser = argparse.ArgumentParser(
              description="Rebin energy spectrum from varispaced to equispaced bins.",
              formatter_class=argparse.RawDescriptionHelpFormatter,
              epilog=help_epilog)
     parser.add_argument('infile', help="Input filename")
     parser.add_argument('-b','--binsize', help="Output file binsize in MeV.",
-                        default=0.030, type=float)
+                        default=binsize, type=float)
     parser.add_argument('-s','--start', help="Starting energy in MeV",
-                        default=0.000,type=float)
+                        default=start,type=float)
     parser.add_argument('-o','--outfile', help="Output filename")
     #parser.add_argument('--', help="", default=)
     args = parser.parse_args()
     return args
 
-def readwrite(win):
+def readwrite(win,binsize,start,Infile,Outfile):
 
     """
     Read rebin data from terminal.
     This uses the Python standard library 'curses'
     """
     
-    global infile,outfile,start,binsize,Infile,Outfile
     leave=b'n'
     while leave != b'y':
         win.addstr(3,0,f"Enter input filename [{Infile}]: ")
-        infile=get_valid_name(win, default=infile)
-        win.addstr(5,0,f"Enter output filename [{outfile}]: ")
-        outfile=get_valid_name(win, default=outfile)
+        Infile=get_valid_name(win, default=Infile)
+        if Outfile==None: Outfile=make_new_filepath(Infile,Outfile)
+        win.addstr(5,0,f"Enter output filename [{Outfile}]: ")
+        Outfile=get_valid_name(win, default=Outfile)
         win.addstr(7,0,f"Enter binsize in MeV [{binsize:.3f}]: ")
         binsize=get_valid_float(win, default=binsize)
         win.addstr(9,0,f"Enter start energy in MeV [{start:.3f}]: ")
@@ -72,7 +72,7 @@ def readwrite(win):
         leave=win.getstr(y,x)
         curses.noecho()
         if leave==b'q': exit()
-    return infile,binsize
+    return binsize, start, Infile, Outfile
 
 def get_valid_name(win, default=None):
     """
@@ -82,10 +82,29 @@ def get_valid_name(win, default=None):
     y, x =win.getyx()
     win.clrtoeol()
     curses.echo()
-    s=str(win.getstr(y,x,30),encoding='utf-8')
+    s=str(win.getstr(y,x,80),encoding='utf-8')
     if s=="": s=default
     curses.noecho()
-    return s
+    return Path(s)
+
+def make_new_filepath(infile,outfile):
+    """
+    Helper function for readwrite.
+    Create new file path for Outfile.
+    """
+    if outfile=="" or outfile==None:
+        parent=infile.parent
+        stem=infile.stem
+        suffix=infile.suffix
+        newname=stem+"_rebin"+suffix
+        print(parent,stem,suffix,newname)
+        if parent==".":
+            Outfile=Path(newname)
+        else:
+            Outfile=Path(parent)/newname
+    else:
+        Outfile=Path(outfile)
+    return Outfile
 
 def get_valid_float(win, default=None):
     """
@@ -98,8 +117,7 @@ def get_valid_float(win, default=None):
     loop=True
     while loop:
         try:
-            #if default != None: win.addstr(y,x,"%.3f"%default)
-            s=str(win.getstr(y,x,10),encoding='utf-8')
+            s=str(win.getstr(y,x,20),encoding='utf-8')
             if s=="":
                 f=default
             else:
@@ -128,12 +146,16 @@ def GetBorders(abscissa, counts):
              counts     numpy array containing spectrum counts
     """
     
-    if not isinstance(abscissa, np.ndarray): raise ValueError("Input 'abscissa' is not an array")
+    if not isinstance(abscissa, np.ndarray):
+        raise ValueError("Input 'abscissa' is not an array")
     N=len(abscissa)
-    if N<2: raise ValueError("Too few points in abscissa array")
-    if not isinstance(counts, np.ndarray): raise ValueError("Input 'counts' is not an array")
+    if N<2:
+        raise ValueError("Too few points in abscissa array")
+    if not isinstance(counts, np.ndarray):
+        raise ValueError("Input 'counts' is not an array")
     Nc=len(counts)
-    if Nc != N: raise ValueError("Input arrays have different lengths")
+    if Nc != N:
+        raise ValueError("Input arrays have different lengths")
             
     bounds=[]
         
@@ -196,17 +218,23 @@ def Rebinner(old, counts, new, debug=False):
              new     numpy array containing values for new scale, equally spaced
     """
     DEBUG=debug
-    if not isinstance(old, np.ndarray): raise ValueError("Input old is not an array")
-    if not isinstance(new, np.ndarray): raise ValueError("Input new is not an array")
-    if not isinstance(counts, np.ndarray): raise ValueError("Input counts is not an array")
+    if not isinstance(old, np.ndarray):
+        raise ValueError("Input old is not an array")
+    if not isinstance(new, np.ndarray):
+        raise ValueError("Input new is not an array")
+    if not isinstance(counts, np.ndarray):
+        raise ValueError("Input counts is not an array")
     N1=len(old)
-    if N1<2: raise ValueError("Too few points in original scale array")
+    if N1<2:
+        raise ValueError("Too few points in original scale array")
     N2=len(counts)
-    print(N1,N2)
-    if N2<2: raise ValueError("Too few points in original count array")
-    if N1 != N2: raise ValueError("old and count do not have same length")
+    if N2<2:
+        raise ValueError("Too few points in original count array")
+    if N1 != N2:
+        raise ValueError("old and count do not have same length")
     N3=len(new)
-    if N3<2: raise ValueError("Too few points in new scale array")
+    if N3<2:
+        raise ValueError("Too few points in new scale array")
         
     newcount=np.zeros(N3)
 
@@ -295,7 +323,7 @@ def WriteFile(name, outE, outdata):
     """
     Write a csv file containing the new data in two columns.
     """
-    if name == 'r00000': return
+    #if name == 'r00000': return
     with open(name,'w',newline='') as csvwfile:
         w=csv.writer(csvwfile)
         for i in range(len(outdata)):
@@ -321,23 +349,17 @@ if __name__=="__main__":
         start=args.start
         infile=args.infile
         outfile=args.outfile
-        if outfile == None:
-            outfile=""
+        Infile=Path(infile)
+        if Infile.is_file(): print(Infile, "exists")
+        if outfile=="" or outfile==None:
+            Outfile=make_new_filepath(Infile,outfile)
+        else:
+            Outfile=Path(outfile)
+        if Outfile.is_file(): print(Outfile, "exists")
     else:
-        a=curses.wrapper(readwrite)
-    print(a)
-    exit()
+        binsize,start,Infile,Outfile=curses.wrapper(readwrite,binsize,start,Infile,Outfile)
     ###print("Here we go...")
     ###print(infile,outfile,start,binsize)
-    Infile=Path(infile)
-    if Infile.is_file(): print(Infile, "exists")
-    stem=Infile.stem
-    suffix=Infile.suffix
-    if outfile=="" or outfile==None:
-        Outfile=Path(stem+"_rebin"+suffix)
-    else:
-        Outfile=Path(outfile)
-    if Outfile.is_file(): print(Outfile, "exists")
     ###print(Outfile)
 
     print("infile:",Infile)
