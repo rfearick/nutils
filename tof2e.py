@@ -39,7 +39,13 @@ def processargs():
              formatter_class=argparse.RawDescriptionHelpFormatter,
              epilog=help_epilog)
     parser.add_argument('infile', help="Input filename")
+    parser.add_argument('-t','--tzero', help="Time zero in channels.",
+                        default=binsize, type=float)
+    parser.add_argument('-d','--distance', help="Target to detector distance in m.",
+                        default=binsize, type=float)
     parser.add_argument('-b','--binsize', help="Output file binsize in MeV.",
+                        default=binsize, type=float)
+    parser.add_argument('-c','--chperns', help="TOF channels per ns.",
                         default=binsize, type=float)
     parser.add_argument('-s','--start', help="Starting energy in MeV",
                         default=start,type=float)
@@ -48,7 +54,7 @@ def processargs():
     args = parser.parse_args()
     return args
 
-def readwrite(win,t0,distance,binsize,start,Infile,Outfile):
+def readwrite(win,t0,distance,chperns,binsize,start,Infile,Outfile):
 
     """
     Read rebin data from terminal.
@@ -62,21 +68,23 @@ def readwrite(win,t0,distance,binsize,start,Infile,Outfile):
         if Outfile==None: Outfile=make_new_filepath(Infile,Outfile)
         win.addstr(5,0,f"Enter output filename [{Outfile}]: ")
         Outfile=get_valid_name(win, default=Outfile)
-        win.addstr(7,0,f"Enter t0 in ns [{t0:.3f}]: ")
+        win.addstr(7,0,f"Enter t0 in channels [{t0:.3f}]: ")
         t0=get_valid_float(win, default=t0)
         win.addstr(9,0,f"Enter target-detector distance in m [{distance:.3f}]: ")
         distance=get_valid_float(win, default=distance)
-        win.addstr(11,0,f"Enter binsize in MeV [{binsize:.3f}]: ")
+        win.addstr(11,0,f"Enter TOF channels per ns [{chperns:.3f}]: ")
+        chperns=get_valid_float(win,default=chperns)
+        win.addstr(13,0,f"Enter binsize in MeV [{binsize:.3f}]: ")
         binsize=get_valid_float(win, default=binsize)
-        win.addstr(13,0,f"Enter start energy in MeV [{start:.3f}]: ")
+        win.addstr(15,0,f"Enter start energy in MeV [{start:.3f}]: ")
         start=get_valid_float(win, default=start)
-        win.addstr(17,0,"OK to proceed? [y/n/q]: ")
+        win.addstr(21,0,"OK to proceed? [y/n/q]: ")
         y, x =win.getyx()
         curses.echo()
         leave=win.getstr(y,x)
         curses.noecho()
         if leave==b'q': exit()
-    return t0,distance,binsize, start, Infile, Outfile
+    return t0,distance,chperns,binsize, start, Infile, Outfile
 
 def get_valid_name(win, default=None, mustexist=False):
     """
@@ -306,7 +314,7 @@ def Rebinner(old, counts, new, debug=False):
 
 def ReadFile(name):
     """
-    Read csv file containing two columns of data (E, count).
+    Read csv file containing one columns of data (count).
 
     Conflate all bins with same energy (due to rounding issues at source)
     while preserving total count in spectrum.
@@ -315,21 +323,12 @@ def ReadFile(name):
     with open(name,newline='') as csvfile:
         r=csv.reader(csvfile)
         data=[]
-        count=0
-        preve=None
         for row in r:
-            if len(row)<2: break
-            tmpe=float(row[0])
+            if len(row)<1: break
+            #print(row)
+            tmpt=float(row[0])
             tmpcount=int(row[1])
-            # merge rows with same energy
-            if preve==tmpe:
-                count+=tmpcount
-            else:
-                if preve != None:
-                    data.append([preve, count])
-                count=tmpcount
-                preve=tmpe
-        data.append([tmpe,tmpcount])
+            data.append([tmpt,tmpcount])
     data=np.array(data)
     return data
 
@@ -350,10 +349,11 @@ if __name__=="__main__":
     c=0.299792458 # m/ns
     mn=939.565 # MeV/c^2
     # globals
-    t0=0.0
-    distance=1.0
-    start=0.0
-    binsize=0.030
+    t0=0.0       # time of flight zero (time at target)
+    distance=1.0 # targer to detector distance
+    chperns=1.0  # channels per ns
+    start=0.0    # initial energy in energy spectrum
+    binsize=0.030 # width of bin in energy spectrum
     #infile=None
     #outfile=None
     Infile=None
@@ -375,31 +375,50 @@ if __name__=="__main__":
             Outfile=Path(outfile)
         if Outfile.is_file(): print(Outfile, "exists")
     else:
-        ret=curses.wrapper(readwrite,t0,distance,binsize,start,Infile,Outfile)
-        t0,distance,binsize,start,Infile,Outfile=ret
+        ret=curses.wrapper(readwrite,t0,distance,chperns,binsize,start,Infile,Outfile)
+        t0,distance,chperns,binsize,start,Infile,Outfile=ret
 
     print("infile:",Infile)
     print("outfile:",Outfile)
     print("t0:",t0)
     print("distance:",distance)
+    print("chperns:",chperns)
     print("start:",start)
     print("binsize:",binsize)
     
     data = ReadFile(Infile)
-    # extract columns of t, count
-    tn=data[:,0]
+    # extract columns of count
+    tn=np.arange(len(data[:,1]))/chperns
     cn=data[:,1]
+    nt0=int(t0-chperns/(distance/c))-2
+    #cn=cn[0:nt0]
+    #tn=tn[0:nt0]
+    cn=cn[0:720]
+    tn=tn[0:720]
+    #print(tn)
     # dimensionless time
+    t0=t0/chperns
     taun=(t0-tn)/(distance/c)
+    n=len(taun)-1
+    while n>1:
+        if taun[n]>1.0: break
+        n=n-1
+    taun=taun[0:n]
+    cn=cn[0:n]
+    #print(taun)
+    #print(cn)
     # convert to gamma
     gamman=taun/np.sqrt(taun**2-1)
     # convert to kinetic energy
     En=mn*(gamman-1)
+    print(En)
     # set up target energies
     maxE = En[-1]+binsize
+    print(start,maxE,binsize,En[-1])
     outE=np.arange(start,maxE,binsize)
     # rebin and write out.
-    R=Rebinner(En,data[:,1],outE)
+    print(len(tn),len(cn),len(taun),len(gamman),len(En),len(outE))
+    R=Rebinner(En,cn,outE)
     WriteFile(Outfile, outE, R)
 
     Plot=False
@@ -407,8 +426,8 @@ if __name__=="__main__":
     if Plot:
         import matplotlib.pyplot as plt
         plt.figure(figsize=(16,6))
-        scale=np.max(data[:,1])/np.max(R)
-        plt.plot(En,data[:,1]/scale,drawstyle='steps-mid')
+        scale=np.max(cn)/np.max(R)
+        plt.plot(En,cn/scale,drawstyle='steps-mid')
         plt.plot(outE,R,drawstyle='steps-mid')
         plt.xlabel("Energy [MeV]")
         plt.ylabel("Counts per channel")
