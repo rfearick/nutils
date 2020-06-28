@@ -390,11 +390,18 @@ if __name__=="__main__":
     # extract columns of count
     tn=np.arange(len(data[:,1]))/chperns
     cn=data[:,1]
-    nt0=int(t0-chperns/(distance/c))-2
-    #cn=cn[0:nt0]
-    #tn=tn[0:nt0]
-    cn=cn[0:720]
-    tn=tn[0:720]
+    nt0=int(t0-chperns*(distance/c))-2
+    print("nt0:",nt0)
+    eb=66.0*1.15
+    gammab=eb/mn+1.0
+    taub=gammab/np.sqrt(gammab**2-1.0)
+    ntb=int(taub*(distance/c)*chperns)
+    print("ntb",ntb)
+    nt0=int(t0-ntb)
+    cn=cn[0:nt0]
+    tn=tn[0:nt0]
+    #cn=cn[0:720]
+    #tn=tn[0:720]
     #print(tn)
     # dimensionless time
     t0=t0/chperns
@@ -411,7 +418,7 @@ if __name__=="__main__":
     gamman=taun/np.sqrt(taun**2-1)
     # convert to kinetic energy
     En=mn*(gamman-1)
-    print(En)
+    #print(En)
     # set up target energies
     maxE = En[-1]+binsize
     print(start,maxE,binsize,En[-1])
@@ -427,10 +434,11 @@ if __name__=="__main__":
         import matplotlib.pyplot as plt
         plt.figure(figsize=(16,6))
         scale=np.max(cn)/np.max(R)
-        plt.plot(En,cn/scale,drawstyle='steps-mid')
-        plt.plot(outE,R,drawstyle='steps-mid')
+        plt.plot(outE,R,drawstyle='steps-mid',label='rebinned')
+        plt.plot(En,cn/scale,drawstyle='steps-mid',label='from tof')
         plt.xlabel("Energy [MeV]")
         plt.ylabel("Counts per channel")
+        plt.legend()
         plt.show()
 
     
