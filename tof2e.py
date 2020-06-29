@@ -315,7 +315,6 @@ def Rebinner(old, counts, new, debug=False):
         if iold>=N1: break
         if DEBUG: print("")
     newcount[i]+=leftover
-    print('leftover',inbounds[iold].count,inbounds[iold-1].count)    
     return newcount
 
 def ReadFile(name):
@@ -361,8 +360,6 @@ if __name__=="__main__":
     chperns=1.0  # channels per ns
     start=0.0    # initial energy in energy spectrum
     binsize=0.030 # width of bin in energy spectrum
-    #infile=None
-    #outfile=None
     Infile=None
     Outfile=None
 
@@ -398,48 +395,33 @@ if __name__=="__main__":
     #tn=data[:,0]
     tn=np.arange(len(data[:,1]))/chperns
     cn=data[:,1]
-    #nt0=int(t0-chperns*(distance/c))-2
-    #print("nt0:",nt0, tn[-1],tn[0])
-    #ebeam=66.0*1.15
     ebeam=energy*1.1  # 10% higher gives reasonable cutoff
     # find tof channel of slightly above beam energy (reasonable cutoff?)
     gammabeam=ebeam/mn+1.0
     taubeam=gammabeam/np.sqrt(gammabeam**2-1.0)
     ntbeam=int(taubeam*(distance/c)*chperns)
-    print("ntb",ntbeam)
     ntop=int(t0-ntbeam)
+    # truncate spectra to limit energy range
     cn=cn[0:ntop]
     tn=tn[0:ntop]
-    #cn=cn[0:720]
-    #tn=tn[0:720]
-    #print(tn)
     # dimensionless time
     t0=t0/chperns
     taun=(t0-tn)/(distance/c)
-    #n=len(taun)-1
-    #while n>1:
-    #    if taun[n]>1.0: break
-    #    n=n-1
-    #taun=taun[0:n]
-    #cn=cn[0:n]
-    #print(taun)
-    #print(cn)
     # convert to gamma
     gamman=taun/np.sqrt(taun**2-1)
     # convert to kinetic energy
     En=mn*(gamman-1)
-    #print(En)
     # set up target energies
     maxE = En[-1]+binsize
     print(start,maxE,binsize,En[-1])
     outE=np.arange(start,maxE,binsize)
     # rebin and write out.
-    print(len(tn),len(cn),len(taun),len(gamman),len(En),len(outE))
     R=Rebinner(En,cn,outE)
     WriteFile(Outfile, outE, R)
 
+    print("Check on total counts in spectra. TOF=%d, Energy=%d."%(np.sum(cn),np.sum(R)))
     Plot=False
-    Plot=True
+    #Plot=True
     if Plot:
         import matplotlib.pyplot as plt
         plt.figure(figsize=(16,6))
@@ -450,7 +432,6 @@ if __name__=="__main__":
         plt.ylabel("Counts per channel")
         plt.legend()
         plt.show()
-        print(np.sum(cn),np.sum(R))
 
     
     
