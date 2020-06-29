@@ -41,6 +41,8 @@ def processargs():
     parser.add_argument('infile', help="Input filename")
     parser.add_argument('-t','--tzero', help="Time zero in channels.",
                         default=binsize, type=float)
+    parser.add_argument('-e','--energy', help="Beam energy in MeV.",
+                        default=binsize, type=float)
     parser.add_argument('-d','--distance', help="Target to detector distance in m.",
                         default=binsize, type=float)
     parser.add_argument('-b','--binsize', help="Output file binsize in MeV.",
@@ -54,7 +56,7 @@ def processargs():
     args = parser.parse_args()
     return args
 
-def readwrite(win,t0,distance,chperns,binsize,start,Infile,Outfile):
+def readwrite(win,energy,t0,distance,chperns,binsize,start,Infile,Outfile):
 
     """
     Read rebin data from terminal.
@@ -68,15 +70,17 @@ def readwrite(win,t0,distance,chperns,binsize,start,Infile,Outfile):
         if Outfile==None: Outfile=make_new_filepath(Infile,Outfile)
         win.addstr(5,0,f"Enter output filename [{Outfile}]: ")
         Outfile=get_valid_name(win, default=Outfile)
-        win.addstr(7,0,f"Enter t0 in channels [{t0:.3f}]: ")
+        win.addstr(7,0,f"Enter energy in MeV [{energy:.3f}]: ")
+        energy=get_valid_float(win, default=energy)
+        win.addstr(9,0,f"Enter t0 in channels [{t0:.3f}]: ")
         t0=get_valid_float(win, default=t0)
-        win.addstr(9,0,f"Enter target-detector distance in m [{distance:.3f}]: ")
+        win.addstr(11,0,f"Enter target-detector distance in m [{distance:.3f}]: ")
         distance=get_valid_float(win, default=distance)
-        win.addstr(11,0,f"Enter TOF channels per ns [{chperns:.3f}]: ")
+        win.addstr(13,0,f"Enter TOF channels per ns [{chperns:.3f}]: ")
         chperns=get_valid_float(win,default=chperns)
-        win.addstr(13,0,f"Enter binsize in MeV [{binsize:.3f}]: ")
+        win.addstr(15,0,f"Enter binsize in MeV [{binsize:.3f}]: ")
         binsize=get_valid_float(win, default=binsize)
-        win.addstr(15,0,f"Enter start energy in MeV [{start:.3f}]: ")
+        win.addstr(17,0,f"Enter start energy in MeV [{start:.3f}]: ")
         start=get_valid_float(win, default=start)
         win.addstr(21,0,"OK to proceed? [y/n/q]: ")
         y, x =win.getyx()
@@ -84,7 +88,7 @@ def readwrite(win,t0,distance,chperns,binsize,start,Infile,Outfile):
         leave=win.getstr(y,x)
         curses.noecho()
         if leave==b'q': exit()
-    return t0,distance,chperns,binsize, start, Infile, Outfile
+    return energy,t0,distance,chperns,binsize, start, Infile, Outfile
 
 def get_valid_name(win, default=None, mustexist=False):
     """
@@ -274,6 +278,7 @@ def Rebinner(old, counts, new, debug=False):
         
     # fill output bin by bin
     for i in range(inew,N3):
+        leftover=0
         # borders of output bin
         nlow=new[i]-outdiff
         nhigh=new[i]+outdiff
@@ -303,13 +308,14 @@ def Rebinner(old, counts, new, debug=False):
             if DEBUG: print("skip")
             inbounds[iold].low=nhigh
             inbounds[iold].count = leftover
-            leftover = 0
+            #if i<N3-1: leftover = 0
         else:  # ... handle next input bin
             iold+=1
         # check for out of bounds
         if iold>=N1: break
         if DEBUG: print("")
-        
+    newcount[i]+=leftover
+    print('leftover',inbounds[iold].count,inbounds[iold-1].count)    
     return newcount
 
 def ReadFile(name):
@@ -349,6 +355,7 @@ if __name__=="__main__":
     c=0.299792458 # m/ns
     mn=939.565 # MeV/c^2
     # globals
+    energy=66.0  # beam energy in MeV
     t0=0.0       # time of flight zero (time at target)
     distance=1.0 # targer to detector distance
     chperns=1.0  # channels per ns
@@ -375,8 +382,8 @@ if __name__=="__main__":
             Outfile=Path(outfile)
         if Outfile.is_file(): print(Outfile, "exists")
     else:
-        ret=curses.wrapper(readwrite,t0,distance,chperns,binsize,start,Infile,Outfile)
-        t0,distance,chperns,binsize,start,Infile,Outfile=ret
+        ret=curses.wrapper(readwrite,energy,t0,distance,chperns,binsize,start,Infile,Outfile)
+        energy,t0,distance,chperns,binsize,start,Infile,Outfile=ret
 
     print("infile:",Infile)
     print("outfile:",Outfile)
@@ -388,30 +395,33 @@ if __name__=="__main__":
     
     data = ReadFile(Infile)
     # extract columns of count
+    #tn=data[:,0]
     tn=np.arange(len(data[:,1]))/chperns
     cn=data[:,1]
-    nt0=int(t0-chperns*(distance/c))-2
-    print("nt0:",nt0)
-    eb=66.0*1.15
-    gammab=eb/mn+1.0
-    taub=gammab/np.sqrt(gammab**2-1.0)
-    ntb=int(taub*(distance/c)*chperns)
-    print("ntb",ntb)
-    nt0=int(t0-ntb)
-    cn=cn[0:nt0]
-    tn=tn[0:nt0]
+    #nt0=int(t0-chperns*(distance/c))-2
+    #print("nt0:",nt0, tn[-1],tn[0])
+    #ebeam=66.0*1.15
+    ebeam=energy*1.1  # 10% higher gives reasonable cutoff
+    # find tof channel of slightly above beam energy (reasonable cutoff?)
+    gammabeam=ebeam/mn+1.0
+    taubeam=gammabeam/np.sqrt(gammabeam**2-1.0)
+    ntbeam=int(taubeam*(distance/c)*chperns)
+    print("ntb",ntbeam)
+    ntop=int(t0-ntbeam)
+    cn=cn[0:ntop]
+    tn=tn[0:ntop]
     #cn=cn[0:720]
     #tn=tn[0:720]
     #print(tn)
     # dimensionless time
     t0=t0/chperns
     taun=(t0-tn)/(distance/c)
-    n=len(taun)-1
-    while n>1:
-        if taun[n]>1.0: break
-        n=n-1
-    taun=taun[0:n]
-    cn=cn[0:n]
+    #n=len(taun)-1
+    #while n>1:
+    #    if taun[n]>1.0: break
+    #    n=n-1
+    #taun=taun[0:n]
+    #cn=cn[0:n]
     #print(taun)
     #print(cn)
     # convert to gamma
@@ -440,6 +450,7 @@ if __name__=="__main__":
         plt.ylabel("Counts per channel")
         plt.legend()
         plt.show()
+        print(np.sum(cn),np.sum(R))
 
     
     
